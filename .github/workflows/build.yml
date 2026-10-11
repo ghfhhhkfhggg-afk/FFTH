@@ -30,14 +30,32 @@ jobs:
           [ -n "$PROJECT" ] || { echo 'No .xcodeproj found inside zip.' >&2; exit 1; }
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
           echo "Project found: $PROJECT"
+          
+          # แสดงรายการ Scheme ทั้งหมดในโปรเจกต์
+          echo "Available schemes:"
+          xcodebuild -list -project "$PROJECT" 2>/dev/null | grep -A 100 "Schemes:" | grep -v "Schemes:" | sed '/^$/q' | sed 's/^ *//'
 
-      - name: Build unsigned archive
+      - name: Auto-detect scheme & build
         run: |
           set -euo pipefail
           PROJECT="${{ steps.extract.outputs.project }}"
-          SCHEME=$(basename "$PROJECT" .xcodeproj)
+          # ดึงชื่อ Scheme แรกจากในโปรเจกต์
+          SCHEME=$(xcodebuild -list -project "$PROJECT" 2>/dev/null | awk '/Schemes:/{getline; print; exit}' | sed 's/^ *//')
+          [ -n "$SCHEME" ] || { echo 'No scheme found!' >&2; exit 1; }
+          echo "Using scheme: $SCHEME"
+          
           ARCHIVE="$RUNNER_TEMP/App.xcarchive"
-          xcodebuild archive -project "$PROJECT" -scheme "$SCHEME" -sdk iphoneos -configuration Release -archivePath "$ARCHIVE" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest | tee "$RUNNER_TEMP/xcodebuild.log"
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath "$ARCHIVE" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest \
+            | tee "$RUNNER_TEMP/xcodebuild.log"
 
       - name: Package IPA
         run: |
