@@ -24,7 +24,9 @@ jobs:
           EXTRACT_DIR="$RUNNER_TEMP/source"
           mkdir -p "$EXTRACT_DIR"
           unzip -o "$ZIP" -d "$EXTRACT_DIR"
-          PROJECT=$(find "$EXTRACT_DIR" -name '*.xcodeproj' -type d -print -quit)
+          
+          # หาโปรเจกต์ — ข้ามโฟลเดอร์ __MACOSX
+          PROJECT=$(find "$EXTRACT_DIR" -name '*.xcodeproj' -type d -not -path '*/__MACOSX/*' -print -quit)
           [ -n "$PROJECT" ] || { echo 'No .xcodeproj found inside zip.' >&2; exit 1; }
           echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
           echo "Project found: $PROJECT"
@@ -33,8 +35,9 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT="${{ steps.extract.outputs.project }}"
+          SCHEME=$(basename "$PROJECT" .xcodeproj)
           ARCHIVE="$RUNNER_TEMP/App.xcarchive"
-          xcodebuild archive -project "$PROJECT" -scheme "OGIOS" -sdk iphoneos -configuration Release -archivePath "$ARCHIVE" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest | tee "$RUNNER_TEMP/xcodebuild.log"
+          xcodebuild archive -project "$PROJECT" -scheme "$SCHEME" -sdk iphoneos -configuration Release -archivePath "$ARCHIVE" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY='' PRODUCT_BUNDLE_IDENTIFIER=com.apple.mobile.MobileHouseArrest | tee "$RUNNER_TEMP/xcodebuild.log"
 
       - name: Package IPA
         run: |
